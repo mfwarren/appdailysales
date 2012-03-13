@@ -1,6 +1,6 @@
 # Introduction
 
-AppDailySales is a Python script that will download daily sales report files from the iTunes Connect web site.  
+AppDailySales is a Python script that will download daily sales report files from the iTunes Connect web site.
 
 # How to Use
 
@@ -17,6 +17,7 @@ Download the script appdailysales.py and run the command line:
     -h     : print this help message and exit (also --help)
     -a uid : your apple id (also --appleId)
     -p pwd : your password (also --password)
+    -b publisherId : your publisher ID used for iAd
     -P     : read the password from stdin (also --passwordStdin)
     -o dir : directory where download file is stored, default is the current working directory (also --outputDirectory)
     -v     : verbose output, default is off (also --verbose)
@@ -54,7 +55,7 @@ As of Version 1.3 the AppDailySales script can be used as part of another script
         print 'Report file downloaded: ', filename
       except:
         traceback.print_exc()
-	
+
     if __name__ == '__main__':
       main()
 
@@ -62,9 +63,9 @@ The function **appdailysales.downloadFile** will return the name of the last fil
 
 ## Download Reports Multiple Days
 
-As of version 1.6, there is a -d (also --days) option that is used to specify the number of days to download.  The default is 1, which will download yesterday's report and keeps the script backwards compatible with the previous versions. Any value can be used for this option.  However please note that as of now Apple only stores the last 7 days of daily sales reports.  Using a value greater than 7 will result in a "report not available" error. 
+As of version 1.6, there is a -d (also --days) option that is used to specify the number of days to download.  The default is 1, which will download yesterday's report and keeps the script backwards compatible with the previous versions. Any value can be used for this option.  However please note that as of now Apple only stores the last 7 days of daily sales reports.  Using a value greater than 7 will result in a "report not available" error.
 
-Why not add a check in the script to prevent values greater than 7? I decided not to include the check on the off chance Apple decides to provide access to reports older than 7 days.  
+Why not add a check in the script to prevent values greater than 7? I decided not to include the check on the off chance Apple decides to provide access to reports older than 7 days.
 
 ## Report File Name Formatting
 
@@ -81,6 +82,10 @@ The script was written for and has been tested with **Python version 2.5.x, 2.6.
 Version 2.4 introduces the new --debug flag. This flag will display additional verbose output for debugging and troubleshooting the script. Also, when this flag is turned on and the script encounters a screen scraping error, a file named temp.html is created and stored in the output directory. This file contains the HTML downloaded in the last web request.
 
 # Change History
+
+**Version 2.9.3*
+
+  * Updated script to download iAd reports (daily).
 
 **Version 2.9.2**
 
@@ -103,7 +108,7 @@ Version 2.4 introduces the new --debug flag. This flag will display additional v
   * Changed how content-disposition is checked to avoid attempts of unzipping HTML.
 
 **Version 2.6**
-  
+
   * Updated the script to support the new URL to the Sales and Trends web site. (Thanks ferenc.vehmann)
   * Enabled RFC2965 cookie support. (Thanks troegenator)
 
@@ -146,7 +151,7 @@ Version 2.4 introduces the new --debug flag. This flag will display additional v
 **Version 2.0**
 
   * Updated to support September 9, 2010 iTunes Connect changes.
-  * Dropped BeautifulSoup support. I don't have the time to support two separate screen scraping approaches. 
+  * Dropped BeautifulSoup support. I don't have the time to support two separate screen scraping approaches.
 
 **Version 1.10**
 
