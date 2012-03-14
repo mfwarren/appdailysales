@@ -519,6 +519,133 @@ def downloadFile(options):
 
 
 
+def getPublisherId(options):
+    if options.verbose == True:
+        print '-- begin script --'
+
+    if (options.outputDirectory != '' and not os.path.exists(options.outputDirectory)):
+        os.makedirs(options.outputDirectory)
+
+    urlITCBase = 'https://itunesconnect.apple.com%s'
+
+    handlers = []                      # proxy support
+    if options.proxy:                  # proxy support
+        handlers.append(urllib2.ProxyHandler({"https": options.proxy}))      # proxy support
+
+    cj = MyCookieJar()
+    cj.set_policy(cookielib.DefaultCookiePolicy(rfc2965=True))
+    cjhdr = urllib2.HTTPCookieProcessor(cj)
+    handlers.append(cjhdr)             # proxy support
+    opener = urllib2.build_opener(*handlers)        # proxy support
+
+    if options.verbose == True:
+        print 'Signing into iTunes Connect web site.'
+
+    # Go to the iTunes Connect website and retrieve the
+    # form action for logging into the site.
+    urlWebsite = urlITCBase % '/WebObjects/iTunesConnect.woa'
+    html = readHtml(opener, urlWebsite, options=options)
+    match = re.search('" action="(.*)"', html)
+    urlActionLogin = urlITCBase % match.group(1)
+
+
+    # Login to iTunes Connect web site and go to the sales
+    # report page, get the form action url and form fields.
+    # Note the sales report page will actually load a blank
+    # page that redirects to the static URL. Best guess here
+    # is that the server is setting some session variables
+    # or something.
+    webFormLoginData = urllib.urlencode({'theAccountName':options.appleId, 'theAccountPW':options.password, '1.Continue':'0'})
+    html = readHtml(opener, urlActionLogin, webFormLoginData, options=options)
+    if (html.find('Your Apple ID or password was entered incorrectly.') != -1):
+        raise ITCException, 'User or password incorrect.'
+
+
+    # Sometimes the vendor default page does not load right away.
+    # This causes the script to fail, so as a work around, the
+    # script will attempt to load the page 3 times before abend.
+    vendorDefaultPageAttempts = 3
+    while vendorDefaultPageAttempts > 0:
+        vendorDefaultPageAttempts = vendorDefaultPageAttempts - 1
+        urlSalesAndTrends = 'https://reportingitc.apple.com/'
+        html = readHtml(opener, urlSalesAndTrends, options=options)
+
+        # We're at the vendor default page. Might need additional work if your account
+        # has more than one vendor.
+        try:
+            match = re.findall('"javax.faces.ViewState" value="(.*?)"', html)
+            viewState = match[0]
+            match = re.findall('script id="defaultVendorPage:(.*?)"', html)
+            defaultVendorPage = match[0]
+            ajaxName = re.sub('_2', '_0', defaultVendorPage)
+            if options.debug == True:
+                print 'viewState: ', viewState
+                print 'defaultVendorPage: ', defaultVendorPage
+                print 'ajaxName: ', ajaxName
+            vendorDefaultPageAttempts = 0 # exit loop
+        except:
+            if vendorDefaultPageAttempts < 1:
+                errMessage = 'Unable to load default vendor page.'
+                if options.verbose == True:
+                    print errMessage
+                    raise
+                else:
+                    raise ITCException, errMessage
+
+    # This may seem confusing because we just accessed the vendor default page in the
+    # code above. However, the vendor default page as a piece of javascript that runs
+    # once the page is loaded in the browser. The javascript does a resubmit. My guess
+    # is this action is needed to set the default vendor on the server-side. Regardless
+    # we must call the page again but no parsing of the HTML is needed this time around.
+    urlDefaultVendorPage = 'https://reportingitc.apple.com/vendor_default.faces'
+    webFormSalesReportData = urllib.urlencode({'AJAXREQUEST':ajaxName, 'javax.faces.ViewState':viewState, 'defaultVendorPage':defaultVendorPage, 'defaultVendorPage:'+defaultVendorPage:'defaultVendorPage:'+defaultVendorPage})
+    html = readHtml(opener, urlDefaultVendorPage, webFormSalesReportData, options=options)
+
+    # Check for notification messages.
+    urlDashboard = 'https://reportingitc.apple.com/subdashboard.faces'
+    html = readHtml(opener, urlDashboard, options=options)
+    try:
+        # Note the (?s) is an inline re.DOTALL, makes . match new lines.
+        match = re.findall('(?s)<div class="notification">(.*?)</span>', html)
+        notificationDiv = match[0]
+        match = re.findall('(?s)<td>(.*?)</td>', notificationDiv)
+        notificationMessage = match[0]
+        if options.verbose == True:
+            print notificationMessage
+    except:
+        pass # Do nothing. We're just checking for notifications.
+
+    # Access the sales report page.
+    if options.verbose == True:
+        print 'Accessing sales report web page.'
+    urlSalesReport = 'https://iad.apple.com/itcportal/'
+    html = readHtml(opener, urlSalesReport, options=options)
+    #print html
+
+
+    if not options.publisherId:
+        #Find the publisher ID
+        params = {'requestId':'GUEST_1331628761939_0__1331628761950__app_homepage',} #the two big numbers here are milliseconds - presumably to measure page performance
+        headers = {'Content-type': 'text/x-gwt-rpc; charset=utf-8'}
+        urlDefaultiAdCsvPage = 'https://iad.apple.com/itcportal/service/startup'
+        webFormSalesReportData = urllib.urlencode(params)
+        body = '5|0|4|https://iad.apple.com/itcportal/itcportal/|4CC9623D5B1BC24D1D88612368C8A35F|com.qwapi.portal.itc.client.rpc.IITCStartupService|getStartupData|1|2|3|4|0|'
+        request = urllib2.Request(urlDefaultiAdCsvPage + "?" + webFormSalesReportData, body, headers)
+        urlHandle = opener.open(request)
+        startupData = urlHandle.read()
+        endpos = startupData.find('com.qwapi.portal.client.rpc.dto.UserDTO')
+        endpos = startupData.find('"', endpos-4)
+        startpos = startupData.rfind('"', endpos-20, endpos-4)
+        if options.verbose:
+            print "found PublisherID:", startupData[startpos+1:endpos]
+        options.publisherID = startupData[startpos+1:endpos]
+        if not int(options.publisherID):
+            raise ITCException("Failed to get publisher ID")
+        return options.publisherID
+
+    return None
+
+
 
 def downloadIAdFile(options):
     if options.verbose == True:
